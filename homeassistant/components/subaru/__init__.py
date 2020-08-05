@@ -44,6 +44,18 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+REMOTE_SERVICE_SCHEMA = vol.Schema({vol.Required(ATTR_VIN): cv.string})
+
+REMOTE_SERVICES = [
+    "lock",
+    "unlock",
+    "lights",
+    "horn",
+    "remote_start",
+    "remote_stop",
+]
+
+
 async def async_setup(hass, base_config):
     """Do nothing since this integration does not support configuration.yml setup."""
     hass.data.setdefault(DOMAIN, {})
@@ -105,6 +117,28 @@ async def async_setup_entry(hass, entry):
     for component in SUPPORTED_PLATFORMS:
         hass.async_create_task(
             hass.config_entries.async_forward_entry_setup(entry, component)
+        )
+
+    async def async_remote_service(call):
+        """Execute remote services."""
+        vin = call.data[ATTR_VIN]
+        result = False
+        if vin not in vehicle_info.keys():
+            _LOGGER.error("VIN %s not found.  Cannot call %s", vin, call.service)
+            raise HomeAssistantError("VIN not found: {vin}")
+        try:
+            _LOGGER.info("calling %s", call.service)
+            result = await getattr(controller, call.service)(vin)
+        except InvalidPIN:
+            _LOGGER.error("Invalid PIN")
+            raise HomeAssistantError("Invalid PIN in configuration")
+        if not result:
+            raise HomeAssistantError(f"Command failed: {call.service}({vin})")
+        return result
+
+    for service in REMOTE_SERVICES:
+        hass.services.async_register(
+            DOMAIN, service, async_remote_service, schema=REMOTE_SERVICE_SCHEMA
         )
 
     return True
