@@ -121,7 +121,7 @@ async def async_setup_entry(hass, entry):
 
     async def async_remote_service(call):
         """Execute remote services."""
-        vin = call.data[ATTR_VIN]
+        vin = call.data[ATTR_VIN].upper()
         result = False
         if vin not in vehicle_info.keys():
             _LOGGER.error("VIN %s not found.  Cannot call %s", vin, call.service)
