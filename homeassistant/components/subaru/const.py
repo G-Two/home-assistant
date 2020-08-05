@@ -30,6 +30,7 @@ API_GEN_1 = "g1"
 API_GEN_2 = "g2"
 
 SUPPORTED_PLATFORMS = [
+    "lock",
     "sensor",
 ]
 

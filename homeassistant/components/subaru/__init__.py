@@ -125,7 +125,7 @@ async def async_setup_entry(hass, entry):
         result = False
         if vin not in vehicle_info.keys():
             _LOGGER.error("VIN %s not found.  Cannot call %s", vin, call.service)
-            raise HomeAssistantError("VIN not found: {vin}")
+            raise HomeAssistantError(f"VIN not found: {vin}")
         try:
             _LOGGER.info("calling %s", call.service)
             result = await getattr(controller, call.service)(vin)
