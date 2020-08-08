@@ -29,6 +29,14 @@ VEHICLE_LAST_UPDATE = "last_update"
 API_GEN_1 = "g1"
 API_GEN_2 = "g2"
 
+REMOTE_SERVICE_LOCK = "lock"
+REMOTE_SERVICE_UNLOCK = "unlock"
+REMOTE_SERVICE_LIGHTS = "lights"
+REMOTE_SERVICE_HORN = "horn"
+REMOTE_SERVICE_REMOTE_START = "remote_start"
+REMOTE_SERVICE_REMOTE_STOP = "remote_stop"
+REMOTE_SERVICE_CHARGE_START = "charge_start"
+
 SUPPORTED_PLATFORMS = [
     "lock",
     "sensor",

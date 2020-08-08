@@ -30,6 +30,14 @@ from .const import (
     ENTRY_COORDINATOR,
     ENTRY_LISTENER,
     ENTRY_VEHICLES,
+    ICONS,
+    REMOTE_SERVICE_CHARGE_START,
+    REMOTE_SERVICE_HORN,
+    REMOTE_SERVICE_LIGHTS,
+    REMOTE_SERVICE_LOCK,
+    REMOTE_SERVICE_REMOTE_START,
+    REMOTE_SERVICE_REMOTE_STOP,
+    REMOTE_SERVICE_UNLOCK,
     SUPPORTED_PLATFORMS,
     VEHICLE_API_GEN,
     VEHICLE_HAS_EV,
@@ -43,17 +51,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-
 REMOTE_SERVICE_SCHEMA = vol.Schema({vol.Required(ATTR_VIN): cv.string})
-
-REMOTE_SERVICES = [
-    "lock",
-    "unlock",
-    "lights",
-    "horn",
-    "remote_start",
-    "remote_stop",
-]
 
 
 async def async_setup(hass, base_config):
@@ -85,8 +83,19 @@ async def async_setup_entry(hass, entry):
         raise ConfigEntryNotReady(err) from err
 
     vehicle_info = {}
+    remote_services = []
     for vin in controller.get_vehicles():
         vehicle_info[vin] = get_vehicle_info(controller, vin)
+        if vehicle_info[vin]["has_remote"]:
+            remote_services.append(REMOTE_SERVICE_HORN)
+            remote_services.append(REMOTE_SERVICE_LIGHTS)
+            remote_services.append(REMOTE_SERVICE_LOCK)
+            remote_services.append(REMOTE_SERVICE_UNLOCK)
+        if vehicle_info[vin]["has_res"] or vehicle_info[vin]["is_ev"]:
+            remote_services.append(REMOTE_SERVICE_REMOTE_START)
+            remote_services.append(REMOTE_SERVICE_REMOTE_STOP)
+        if vehicle_info[vin]["is_ev"]:
+            remote_services.append(REMOTE_SERVICE_CHARGE_START)
 
     async def async_update_data():
         """Fetch data from API endpoint."""
@@ -136,7 +145,7 @@ async def async_setup_entry(hass, entry):
             raise HomeAssistantError(f"Command failed: {call.service}({vin})")
         return result
 
-    for service in REMOTE_SERVICES:
+    for service in remote_services:
         hass.services.async_register(
             DOMAIN, service, async_remote_service, schema=REMOTE_SERVICE_SCHEMA
         )

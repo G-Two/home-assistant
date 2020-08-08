@@ -1,4 +1,4 @@
-# Describes the format for available services for bmw_connected_drive
+# Describes the format for available services for subaru
 lock:
   description: >
     Lock all doors of the vehicle. The vehicle is identified via the vin
@@ -52,6 +52,26 @@ remote_start:
 remote_stop:
   description: >
     Stop the engine and climate control of the vehicle. The vehicle is identified via the vin
+    (see below).
+  fields:
+    vin:
+      description: >
+        The vehicle identification number (VIN) of the vehicle, 17 characters
+      example: JF2ABCDE6L0000001
+
+charge_start:
+  description: >
+    Starts EV charging. This cannot be stopped remotely. The vehicle is identified via the vin
+    (see below).
+  fields:
+    vin:
+      description: >
+        The vehicle identification number (VIN) of the vehicle, 17 characters
+      example: JF2ABCDE6L0000001
+
+update:
+  description: >
+    Sends request to vehicle to update data. The vehicle is identified via the vin
     (see below).
   fields:
     vin:
