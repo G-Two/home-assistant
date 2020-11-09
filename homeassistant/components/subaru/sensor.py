@@ -171,7 +171,7 @@ class SubaruSensor(SubaruEntity):
     @property
     def icon(self):
         """Return icon for sensor."""
-        if self.title == "EV Battery Level":
+        if self.title == "EV Battery Level" and self.coordinator.data.get(self.vin):
             charge_status = (
                 self.coordinator.data[self.vin]["status"].get(sc.EV_CHARGER_STATE_TYPE)
                 == "CHARGING"
@@ -235,12 +235,13 @@ class SubaruSensor(SubaruEntity):
 
     def get_current_value(self):
         """Get raw value from the coordinator."""
-        value = self.coordinator.data[self.vin]["status"].get(self.data_field)
-        if value in sc.BAD_SENSOR_VALUES:
-            value = None
-        if isinstance(value, str):
-            if "." in value:
-                value = float(value)
-            else:
-                value = int(value)
-        return value
+        if self.coordinator.data.get(self.vin):
+            value = self.coordinator.data[self.vin]["status"].get(self.data_field)
+            if value in sc.BAD_SENSOR_VALUES:
+                value = None
+            if isinstance(value, str):
+                if "." in value:
+                    value = float(value)
+                else:
+                    value = int(value)
+            return value

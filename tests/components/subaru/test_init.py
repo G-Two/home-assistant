@@ -1,7 +1,8 @@
 """Test Subaru init process."""
 from datetime import datetime, timedelta
 
-from subarulink import InvalidCredentials, SubaruException
+import pytest
+from subarulink import InvalidCredentials, InvalidPIN, SubaruException
 
 from homeassistant.components import subaru
 from homeassistant.components.subaru.const import (
@@ -11,12 +12,14 @@ from homeassistant.components.subaru.const import (
     DOMAIN,
     ENTRY_CONTROLLER,
     ENTRY_COORDINATOR,
+    REMOTE_SERVICE_HORN,
     VEHICLE_API_GEN,
     VEHICLE_HAS_EV,
     VEHICLE_HAS_REMOTE_SERVICE,
     VEHICLE_HAS_REMOTE_START,
     VEHICLE_HAS_SAFETY_SERVICE,
     VEHICLE_NAME,
+    VEHICLE_VIN,
 )
 from homeassistant.const import (
     CONF_DEVICE_ID,
@@ -25,6 +28,7 @@ from homeassistant.const import (
     CONF_SCAN_INTERVAL,
     CONF_USERNAME,
 )
+from homeassistant.core import HomeAssistantError
 from homeassistant.setup import async_setup_component
 
 from .api_responses import (
@@ -153,6 +157,86 @@ async def test_unload_entry(hass):
     assert await subaru.async_unload_entry(hass, entry)
     assert DOMAIN in hass.data
     assert hass.data[DOMAIN] == {}
+
+
+async def test_remote_service(hass):
+    """Test remote service request."""
+    entry = await setup_subaru_integration(
+        hass, vehicle_list=[TEST_VIN_2_EV], vehicle_data=VEHICLE_DATA[TEST_VIN_2_EV]
+    )
+    assert hass.data[DOMAIN][entry.entry_id]
+
+    with patch(
+        "homeassistant.components.subaru.config_flow.SubaruAPI.horn"
+    ) as mock_horn:
+        await hass.services.async_call(
+            DOMAIN,
+            REMOTE_SERVICE_HORN,
+            {VEHICLE_VIN: TEST_VIN_2_EV},
+            blocking=True,
+        )
+        await hass.async_block_till_done()
+        mock_horn.assert_called_once()
+
+
+async def test_remote_service_invalid_vin(hass):
+    """Test remote service request with invalid VIN."""
+    entry = await setup_subaru_integration(
+        hass, vehicle_list=[TEST_VIN_2_EV], vehicle_data=VEHICLE_DATA[TEST_VIN_2_EV]
+    )
+    assert hass.data[DOMAIN][entry.entry_id]
+
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            DOMAIN,
+            REMOTE_SERVICE_HORN,
+            {VEHICLE_VIN: TEST_VIN_3_G2},
+            blocking=True,
+        )
+        await hass.async_block_till_done()
+
+
+async def test_remote_service_invalid_pin(hass):
+    """Test remote service request with invalid PIN."""
+    entry = await setup_subaru_integration(
+        hass, vehicle_list=[TEST_VIN_2_EV], vehicle_data=VEHICLE_DATA[TEST_VIN_2_EV]
+    )
+    assert hass.data[DOMAIN][entry.entry_id]
+
+    with patch(
+        "homeassistant.components.subaru.config_flow.SubaruAPI.horn",
+        side_effect=InvalidPIN("invalid PIN"),
+    ) as mock_horn:
+        with pytest.raises(HomeAssistantError):
+            await hass.services.async_call(
+                DOMAIN,
+                REMOTE_SERVICE_HORN,
+                {VEHICLE_VIN: TEST_VIN_2_EV},
+                blocking=True,
+            )
+            await hass.async_block_till_done()
+        mock_horn.assert_called_once()
+
+
+async def test_remote_service_fails(hass):
+    """Test remote service request that initiates but fails."""
+    entry = await setup_subaru_integration(
+        hass, vehicle_list=[TEST_VIN_2_EV], vehicle_data=VEHICLE_DATA[TEST_VIN_2_EV]
+    )
+    assert hass.data[DOMAIN][entry.entry_id]
+
+    with patch(
+        "homeassistant.components.subaru.config_flow.SubaruAPI.horn", return_value=False
+    ) as mock_horn:
+        with pytest.raises(HomeAssistantError):
+            await hass.services.async_call(
+                DOMAIN,
+                REMOTE_SERVICE_HORN,
+                {VEHICLE_VIN: TEST_VIN_2_EV},
+                blocking=True,
+            )
+            await hass.async_block_till_done()
+        mock_horn.assert_called_once()
 
 
 TEST_CONFIG = {

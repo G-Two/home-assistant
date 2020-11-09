@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 import logging
 import time
 
-from subarulink import Controller as SubaruAPI, SubaruException
+from subarulink import Controller as SubaruAPI, InvalidPIN, SubaruException
+import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -14,9 +15,9 @@ from homeassistant.const import (
     CONF_SCAN_INTERVAL,
     CONF_USERNAME,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, HomeAssistantError
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import aiohttp_client
+from homeassistant.helpers import aiohttp_client, config_validation as cv
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -30,7 +31,6 @@ from .const import (
     ENTRY_COORDINATOR,
     ENTRY_LISTENER,
     ENTRY_VEHICLES,
-    ICONS,
     REMOTE_SERVICE_CHARGE_START,
     REMOTE_SERVICE_HORN,
     REMOTE_SERVICE_LIGHTS,
@@ -51,7 +51,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-REMOTE_SERVICE_SCHEMA = vol.Schema({vol.Required(ATTR_VIN): cv.string})
+REMOTE_SERVICE_SCHEMA = vol.Schema({vol.Required(VEHICLE_VIN): cv.string})
 
 
 async def async_setup(hass, base_config):
@@ -86,15 +86,18 @@ async def async_setup_entry(hass, entry):
     remote_services = []
     for vin in controller.get_vehicles():
         vehicle_info[vin] = get_vehicle_info(controller, vin)
-        if vehicle_info[vin]["has_remote"]:
+        if vehicle_info[vin][VEHICLE_HAS_REMOTE_SERVICE]:
             remote_services.append(REMOTE_SERVICE_HORN)
             remote_services.append(REMOTE_SERVICE_LIGHTS)
             remote_services.append(REMOTE_SERVICE_LOCK)
             remote_services.append(REMOTE_SERVICE_UNLOCK)
-        if vehicle_info[vin]["has_res"] or vehicle_info[vin]["is_ev"]:
+        if (
+            vehicle_info[vin][VEHICLE_HAS_REMOTE_START]
+            or vehicle_info[vin][VEHICLE_HAS_EV]
+        ):
             remote_services.append(REMOTE_SERVICE_REMOTE_START)
             remote_services.append(REMOTE_SERVICE_REMOTE_STOP)
-        if vehicle_info[vin]["is_ev"]:
+        if vehicle_info[vin][VEHICLE_HAS_EV]:
             remote_services.append(REMOTE_SERVICE_CHARGE_START)
 
     async def async_update_data():
@@ -130,16 +133,14 @@ async def async_setup_entry(hass, entry):
 
     async def async_remote_service(call):
         """Execute remote services."""
-        vin = call.data[ATTR_VIN].upper()
+        vin = call.data[VEHICLE_VIN].upper()
         result = False
         if vin not in vehicle_info.keys():
-            _LOGGER.error("VIN %s not found.  Cannot call %s", vin, call.service)
             raise HomeAssistantError(f"VIN not found: {vin}")
         try:
             _LOGGER.info("calling %s", call.service)
             result = await getattr(controller, call.service)(vin)
         except InvalidPIN:
-            _LOGGER.error("Invalid PIN")
             raise HomeAssistantError("Invalid PIN in configuration")
         if not result:
             raise HomeAssistantError(f"Command failed: {call.service}({vin})")
