@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 import logging
 import time
 
-from subarulink import Controller as SubaruAPI, InvalidPIN, SubaruException
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
@@ -15,10 +14,11 @@ from homeassistant.const import (
     CONF_SCAN_INTERVAL,
     CONF_USERNAME,
 )
-from homeassistant.core import HomeAssistant, HomeAssistantError
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import aiohttp_client, config_validation as cv
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from subarulink import Controller as SubaruAPI, InvalidPIN, SubaruException
 
 from .const import (
     API_GEN_2,
@@ -134,17 +134,32 @@ async def async_setup_entry(hass, entry):
     async def async_remote_service(call):
         """Execute remote services."""
         vin = call.data[VEHICLE_VIN].upper()
-        result = False
+        success = False
         if vin not in vehicle_info.keys():
-            raise HomeAssistantError(f"VIN not found: {vin}")
-        try:
-            _LOGGER.info("calling %s", call.service)
-            result = await getattr(controller, call.service)(vin)
-        except InvalidPIN:
-            raise HomeAssistantError("Invalid PIN in configuration")
-        if not result:
-            raise HomeAssistantError(f"Command failed: {call.service}({vin})")
-        return result
+            hass.components.persistent_notification.create(
+                f"ERROR - Invalid VIN: {vin}", "Subaru"
+            )
+        else:
+            try:
+                _LOGGER.info("calling %s", call.service)
+                hass.components.persistent_notification.create(
+                    f"Sending Remote Command: {call.service} - {vin}\nThis may take 10-15 seconds.",
+                    "Subaru",
+                    DOMAIN,
+                )
+                success = await getattr(controller, call.service)(vin)
+                hass.components.persistent_notification.dismiss(DOMAIN)
+            except InvalidPIN:
+                hass.components.persistent_notification.create(
+                    "ERROR - Invalid PIN", "Subaru"
+                )
+            if not success:
+                hass.components.persistent_notification.create(
+                    f"ERROR - Command failed: {call.service} - {vin}", "Subaru"
+                )
+            hass.components.persistent_notification.create(
+                f"Command completed: {call.service} - {vin}", "Subaru"
+            )
 
     for service in remote_services:
         hass.services.async_register(
