@@ -2,6 +2,7 @@
 import logging
 from typing import Any
 
+from subarulink.controller import Controller
 import voluptuous as vol
 
 from homeassistant.components.lock import LockEntity
@@ -61,7 +62,7 @@ class SubaruLock(LockEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "door_locks"
 
-    def __init__(self, vehicle_info, controller):
+    def __init__(self, vehicle_info: dict, controller: Controller) -> None:
         """Initialize the locks for the vehicle."""
         self.controller = controller
         self.vehicle_info = vehicle_info
@@ -74,6 +75,7 @@ class SubaruLock(LockEntity):
         """Send the lock command."""
         _LOGGER.debug("Locking doors for: %s", self.car_name)
         await async_call_remote_service(
+            self.hass,
             self.controller,
             SERVICE_LOCK,
             self.vehicle_info,
@@ -83,16 +85,18 @@ class SubaruLock(LockEntity):
         """Send the unlock command."""
         _LOGGER.debug("Unlocking doors for: %s", self.car_name)
         await async_call_remote_service(
+            self.hass,
             self.controller,
             SERVICE_UNLOCK,
             self.vehicle_info,
             UNLOCK_VALID_DOORS[UNLOCK_DOOR_ALL],
         )
 
-    async def async_unlock_specific_door(self, door):
+    async def async_unlock_specific_door(self, door: str) -> None:
         """Send the unlock command for a specified door."""
         _LOGGER.debug("Unlocking %s door for: %s", door, self.car_name)
         await async_call_remote_service(
+            self.hass,
             self.controller,
             SERVICE_UNLOCK,
             self.vehicle_info,
